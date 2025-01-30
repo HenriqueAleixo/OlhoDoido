@@ -19,53 +19,74 @@ int eyeLidServoUpper   = 115;  // Posição "aberta"
 // 2) Movimento vertical
 int upDownServoLower   = 0;
 int upDownServoUpper   = 50;
-int upDownServoCentre  = 25;
+int upDownServoCentre  = 90;
 
 // 3) Movimento horizontal
 int leftRightServoLower  = 0;   // Menor valor
 int leftRightServoUpper  = 60;  // Maior valor
-int leftRightServoCentre = 25;  // Centro
+int leftRightServoCentre = 90;  // Centro
+// -----------------------------------------------------------------------
+// Pisca (fecha e abre) a pálpebra usando easing
+void blink(int closeSpeed, int openSpeed, int closeDelay, int openPosition) {
+  // Fecha (eyeLidServoUpper)
+  eyeLidServo.easeTo(eyeLidServoUpper, closeSpeed);
+  while (ServoEasing::areInterruptsActive()) {
+    delay(20);
+  }
 
-void setup() {
-  Serial.begin(115200);
+  // Espera closeDelay, se necessário
+  if (closeDelay > 0) {
+    delay(closeDelay);
+  }
 
-  // Se estiver no ESP32, muitas vezes é preciso alocar timers:
-  // ESP32PWM::allocateTimer(0);
-  // ESP32PWM::allocateTimer(1);
-  // ESP32PWM::allocateTimer(2);
-  // ESP32PWM::allocateTimer(3);
+  // Abre (openPosition)
+  eyeLidServo.startEaseTo(openPosition, openSpeed);
+  // Aqui usamos startEaseTo(), mas se quiser bloquear, podemos aguardar:
+  while (ServoEasing::areInterruptsActive()) {
+    delay(20);
+  }
+}
+// -----------------------------------------------------------------------
+// Move o olho (2 servos) para posição (posLR, posUD) usando "speed" do ServoEasing
+void moveEyeBall(int speed, int posLR, int posUD) {
+  // Garante que a posição está dentro dos limites
+  posLR = constrain(posLR, leftRightServoLower, leftRightServoUpper);
+  posUD = constrain(posUD, upDownServoLower,   upDownServoUpper);
 
-  // (Opcional) Ajuste da frequência de operação do servo (50 Hz)
- // eyeLidServo.setPeriodHertz(50);
-  //upDownServo.setPeriodHertz(50);
-  //leftRightServo.setPeriodHertz(50);
- 
-  // Anexa cada servo ao seu pino
-  eyeLidServo.attach(eyeLidPin);
-  upDownServo.attach(upDownPin);
-  leftRightServo.attach(leftRightPin);
- delay(1000);
-  // Posição inicial (exemplo):
-  // Move pálpebra para "aberta" (upper), e olho centralizado
-  // Usamos a função "easeTo(..., speed)" para demonstrar.
+  // Inicia movimento "easing" simultâneo nos dois servos
+  leftRightServo.setEaseTo(posLR, speed);
+  upDownServo.setEaseTo(posUD, speed);
 
+  // Sincroniza e inicia a interrupção (movimento simultâneo)
+  setEaseToForAllServosSynchronizeAndStartInterrupt(speed);
 
-//eyeLidServo.easeTo(eyeLidServoUpper, 60);
- // upDownServo.easeTo(upDownServoCentre,60);
-  //leftRightServo.easeTo(leftRightServoCentre, 60);
-
-  // Espera o movimento terminar. (Se quiser que tudo acabe junto, use setEaseToForAllServos... etc.)
-  delay(5000);
-
-  // Move pálpebra para um valor mais baixo (fechar um pouco)
-  //eyeLidServo.easeTo(eyeLidServoLower, 40);
-  //delay(100);
+  // Aguardar até terminar a animação
+  while (ServoEasing::areInterruptsActive()) {
+    delay(20);
+  }
 }
 
-void loop() {
- eyeMotion(); // Fica “preso” nessa função
+// -----------------------------------------------------------------------
+// Função para gerar posição aleatória, com maior chance de ficar perto do "centro"
+int getRndEyePos(int lowerLimit, int upperLimit, int centrePos, float centreFactor) {
+  int range = (upperLimit - lowerLimit);
 
+  float centreMin = centrePos - (range * centreFactor) / 2.0;
+  float centreMax = centrePos + (range * centreFactor) / 2.0;
+
+  // Garante que centreMin/centreMax fiquem nos limites
+  centreMin = constrain((int)centreMin, lowerLimit, upperLimit);
+  centreMax = constrain((int)centreMax, lowerLimit, upperLimit);
+
+  // 2 em 3 vezes escolhe um ponto entre centreMin e centreMax
+  if (random(0, 3)) {
+    return random((int)centreMin, (int)centreMax + 1);
+  } else {
+    // 1 em 3 vezes escolhe qualquer valor entre lowerLimit e upperLimit
+    return random(lowerLimit, upperLimit + 1);
+  }
 }
+
 
 // -----------------------------------------------------------------------
 // Rotina principal de animação do olho
@@ -125,65 +146,48 @@ void eyeMotion() {
   }
 }
 
-// -----------------------------------------------------------------------
-// Função para gerar posição aleatória, com maior chance de ficar perto do "centro"
-int getRndEyePos(int lowerLimit, int upperLimit, int centrePos, float centreFactor) {
-  int range = (upperLimit - lowerLimit);
 
-  float centreMin = centrePos - (range * centreFactor) / 2.0;
-  float centreMax = centrePos + (range * centreFactor) / 2.0;
 
-  // Garante que centreMin/centreMax fiquem nos limites
-  centreMin = constrain((int)centreMin, lowerLimit, upperLimit);
-  centreMax = constrain((int)centreMax, lowerLimit, upperLimit);
 
-  // 2 em 3 vezes escolhe um ponto entre centreMin e centreMax
-  if (random(0, 3)) {
-    return random((int)centreMin, (int)centreMax + 1);
-  } else {
-    // 1 em 3 vezes escolhe qualquer valor entre lowerLimit e upperLimit
-    return random(lowerLimit, upperLimit + 1);
-  }
+
+void setup() {
+  Serial.begin(115200);
+
+  // Se estiver no ESP32, muitas vezes é preciso alocar timers:
+  // ESP32PWM::allocateTimer(0);
+  // ESP32PWM::allocateTimer(1);
+  // ESP32PWM::allocateTimer(2);
+  // ESP32PWM::allocateTimer(3);
+
+  // (Opcional) Ajuste da frequência de operação do servo (50 Hz)
+ // eyeLidServo.setPeriodHertz(50);
+  //upDownServo.setPeriodHertz(50);
+  //leftRightServo.setPeriodHertz(50);
+ 
+  // Anexa cada servo ao seu pino
+  eyeLidServo.attach(eyeLidPin);
+  upDownServo.attach(upDownPin);
+  leftRightServo.attach(leftRightPin);
+  delay(1000);
+  // Posição inicial (exemplo):
+  // Move pálpebra para "aberta" (upper), e olho centralizado
+  // Usamos a função "easeTo(..., speed)" para demonstrar.
+
+
+  eyeLidServo.easeTo(eyeLidServoUpper, 60);
+  upDownServo.easeTo(upDownServoCentre,60);
+  leftRightServo.easeTo(leftRightServoCentre, 60);
+
+  // Espera o movimento terminar. (Se quiser que tudo acabe junto, use setEaseToForAllServos... etc.)
+  delay(5000);
+
+  // Move pálpebra para um valor mais baixo (fechar um pouco)
+  //eyeLidServo.easeTo(eyeLidServoLower, 40);
+  //delay(100);
 }
 
-// -----------------------------------------------------------------------
-// Move o olho (2 servos) para posição (posLR, posUD) usando "speed" do ServoEasing
-void moveEyeBall(int speed, int posLR, int posUD) {
-  // Garante que a posição está dentro dos limites
-  posLR = constrain(posLR, leftRightServoLower, leftRightServoUpper);
-  posUD = constrain(posUD, upDownServoLower,   upDownServoUpper);
+void loop() {
+ eyeMotion(); // Fica “preso” nessa função
 
-  // Inicia movimento "easing" simultâneo nos dois servos
-  leftRightServo.setEaseTo(posLR, speed);
-  upDownServo.setEaseTo(posUD, speed);
-
-  // Sincroniza e inicia a interrupção (movimento simultâneo)
-  setEaseToForAllServosSynchronizeAndStartInterrupt(speed);
-
-  // Aguardar até terminar a animação
-  while (ServoEasing::areInterruptsActive()) {
-    delay(20);
-  }
 }
 
-// -----------------------------------------------------------------------
-// Pisca (fecha e abre) a pálpebra usando easing
-void blink(int closeSpeed, int openSpeed, int closeDelay, int openPosition) {
-  // Fecha (eyeLidServoUpper)
-  eyeLidServo.easeTo(eyeLidServoUpper, closeSpeed);
-  while (ServoEasing::areInterruptsActive()) {
-    delay(20);
-  }
-
-  // Espera closeDelay, se necessário
-  if (closeDelay > 0) {
-    delay(closeDelay);
-  }
-
-  // Abre (openPosition)
-  eyeLidServo.startEaseTo(openPosition, openSpeed);
-  // Aqui usamos startEaseTo(), mas se quiser bloquear, podemos aguardar:
-  while (ServoEasing::areInterruptsActive()) {
-    delay(20);
-  }
-}
