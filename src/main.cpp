@@ -14,16 +14,16 @@ int leftRightPin  = 7;
 // Limites dos servos
 // 1) Pálpebra
 int eyeLidServoLower   = 40;   // Posição "fechada"
-int eyeLidServoUpper   = 115;  // Posição "aberta"
+int eyeLidServoUpper   = 140;  // Posição "aberta"
 
 // 2) Movimento vertical
-int upDownServoLower   = 0;
+int upDownServoLower   = 90;
 int upDownServoUpper   = 50;
-int upDownServoCentre  = 90;
+int upDownServoCentre  = 75;
 
 // 3) Movimento horizontal
-int leftRightServoLower  = 0;   // Menor valor
-int leftRightServoUpper  = 60;  // Maior valor
+int leftRightServoLower  = 120;   // Menor valor
+int leftRightServoUpper  = 50;  // Maior valor
 int leftRightServoCentre = 90;  // Centro
 // -----------------------------------------------------------------------
 // Pisca (fecha e abre) a pálpebra usando easing
@@ -145,10 +145,6 @@ void eyeMotion() {
     }
   }
 }
-
-
-
-
 
 void setup() {
   Serial.begin(115200);
